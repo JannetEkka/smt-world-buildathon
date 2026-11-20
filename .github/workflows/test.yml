@@ -1,11 +1,24 @@
 name: test
 on: [push, pull_request]
 jobs:
-  node:
+  unit-and-e2e:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: smt_world/firebase
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: 22 }
-      - run: node --test smt_world/firebase/test/*.test.mjs
-      - run: node smt_world/firebase/build.mjs
+      - uses: actions/setup-java@v4
+        with: { distribution: temurin, java-version: 21 }
+      - run: npm install --no-audit --no-fund
+      - run: npx playwright install --with-deps chromium
+      - name: Unit tests
+        run: npm test
+      - name: Security rules, in the Firestore emulator
+        run: npm run test:rules
+      - name: Build
+        run: npm run build
+      - name: End-to-end tests (real browser, fake microphone)
+        run: npm run test:e2e
