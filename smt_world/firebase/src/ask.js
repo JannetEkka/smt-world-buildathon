@@ -34,7 +34,12 @@ import * as W from "./lib/wav.js";
 const FREE_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-4-hydrogen"];
 const PICK = (() => { try { const m = new URLSearchParams(location.search).get("model"); return FREE_MODELS.includes(m) ? m : null; } catch (e) { return null; } })();
 const MODELS = {
-  answer: PICK ? [PICK, "gemini-3.5-flash-lite"] : ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
+  // MEASURED on the live site 11-20 11:15 UTC (live-smoke.mjs, real Gemini, App Check on):
+  //   gemini-3.5-flash-lite  answered in 3.2 s (classifier 1.4 + answer 1.6)
+  //   gemini-3.8-flash       HTTP 500 from Firebase AI Logic, twice
+  //   gemini-4-hydrogen      answer cut off mid-JSON after 24.7 s
+  // so the model that works leads, and the others are the fallback.
+  answer: PICK ? [PICK, "gemini-3.5-flash-lite"] : ["gemini-3.5-flash-lite", "gemini-3.8-flash"],
   quick:  ["gemini-3.5-flash-lite", "gemini-3.8-flash"],
 };
 const TEXT_MODELS = MODELS.answer;   // what the "ready" line reports
@@ -124,18 +129,20 @@ function logUsage(step, model, res, started, error) {
 }
 
 // generateContent with a fallback chain; returns {res, model}. Throws the last error.
-async function generate(step, params, request, chain = MODELS.answer) {
+async function generate(step, params, request, chain = MODELS.answer, parse = null) {
   let last;
   for (let i = 0; i < chain.length; i++) {
     const model = chain[i], started = performance.now();
     try {
       const res = await getGenerativeModel(ai, { ...params, model }).generateContent(request);
+      const json = parse ? parse(res.response.text()) : undefined;   // a cut-off answer throws here
       logUsage(step, model, res, started);
-      return { res, model };
+      return { res, model, json };
     } catch (e) {
       last = e; logUsage(step, model, null, started, e);
       const msg = String((e && e.message) || e);
-      if (!/\b(404|429|503)\b|not found|quota|exhausted|unavailable|overloaded/i.test(msg) || i === chain.length - 1) throw e;
+      // 11-20: a 500 and a cut-off JSON answer were both seen live; both try the next model
+      if (!/\b(404|429|500|503)\b|not found|quota|exhausted|unavailable|overloaded|internal|JSON|Unexpected end/i.test(msg) || i === chain.length - 1) throw e;
       console.warn(`[GEMINI] FALLBACK ${step} ${model} -> ${chain[i + 1]}: ${msg.slice(0, 120)}`);
     }
   }
@@ -170,7 +177,7 @@ async function transcribe(wavB64, hintLang) {
   const prompt = `Transcribe exactly what the speaker says. The listener chose ${LANG_NAME[hintLang] || "English"}, but write whatever language is actually spoken: Hindi in Devanagari, Bengali in Bengali script, English in Latin letters. Keep coin names (SOL, BTC, ETH, BNB, XRP, ADA, DOGE, LTC) as said. Do not answer, translate or add anything. If there is no speech, return an empty transcript.`;
   const { res } = await generate("transcribe",
     { generationConfig: { responseMimeType: "application/json", responseSchema: TRANSCRIBE_SCHEMA, maxOutputTokens: 400, temperature: 0 } },
-    [{ inlineData: { mimeType: "audio/wav", data: wavB64 } }, { text: prompt }], MODELS.quick);
+    [{ inlineData: { mimeType: "audio/wav", data: wavB64 } }, { text: prompt }], MODELS.quick, JSON.parse);
   const j = JSON.parse(res.response.text());
   return { transcript: String(j.transcript || "").trim(), language: j.language };
 }
@@ -206,7 +213,7 @@ async function classify(text) {
   const nonce = "@@" + Math.random().toString(36).slice(2, 10).toUpperCase() + "@@";
   const { res } = await generate("guard",
     { generationConfig: { responseMimeType: "application/json", responseSchema: GUARD_SCHEMA, maxOutputTokens: 120, temperature: 0 } },
-    G.guardPrompt(text, nonce), MODELS.quick);
+    G.guardPrompt(text, nonce), MODELS.quick, JSON.parse);
   const j = JSON.parse(res.response.text());
   return { category: G.CATEGORIES.includes(j.category) ? j.category : "safe", why: String(j.why || "").slice(0, 200) };
 }
@@ -252,7 +259,7 @@ async function answer(question, lang) {
   const { res, model } = await generate("answer",
     { systemInstruction: sys, generationConfig: { responseMimeType: "application/json",
       responseSchema: answerSchema(catalog.map(f => f.id)), maxOutputTokens: 1200, temperature: 0.4 } },
-    { contents });
+    { contents }, MODELS.answer, JSON.parse);
   const j = JSON.parse(res.response.text());
   return { refuse: j.refuse || "none", text: String(j.answer || "").trim(), points: F.keepPoints(j.points, catalog), catalog, model };
 }
