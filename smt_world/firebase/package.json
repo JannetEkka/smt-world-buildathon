@@ -1,0 +1,25 @@
+{
+  "name": "smt-world-firebase",
+  "private": true,
+  "description": "SMT World on Firebase: voice Ask SMT (Hindi, Bengali, English), checked reasons, five guard layers",
+  "type": "module",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "node build.mjs",
+    "test": "node --test test/*.test.mjs",
+    "test:e2e": "node --test e2e/*.e2e.mjs",
+    "test:all": "npm test && npm run test:rules && npm run test:e2e",
+    "smoke:live": "node e2e/live-smoke.mjs",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-smt \"node --test test/rules.emulator.mjs\"",
+    "deploy": "firebase deploy --only hosting,firestore:rules"
+  },
+  "devDependencies": {
+    "@firebase/rules-unit-testing": "6.0.0",
+    "axe-core": "4.10.3",
+    "firebase": "13.2.0",
+    "firebase-tools": "15.37.0",
+    "playwright": "1.63.0"
+  }
+}

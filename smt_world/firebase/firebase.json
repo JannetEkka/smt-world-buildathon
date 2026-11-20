@@ -1,11 +1,75 @@
 {
   "hosting": {
     "public": "public",
-    "ignore": ["firebase.json", "**/.*"],
+    "ignore": [
+      "firebase.json",
+      "**/.*"
+    ],
     "headers": [
-      { "source": "**/*.@(json|html|js|css)", "headers": [ { "key": "Cache-Control", "value": "no-cache" } ] },
-      { "source": "**/*.@(webp|png|woff2|ttf)", "headers": [ { "key": "Cache-Control", "value": "public, max-age=86400" } ] },
-      { "source": "**", "headers": [ { "key": "Permissions-Policy", "value": "microphone=(self)" } ] }
+      {
+        "source": "**/*.@(json|html|js|css)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache"
+          }
+        ]
+      },
+      {
+        "source": "**/*.@(webp|png|woff2|ttf)",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "public, max-age=86400"
+          }
+        ]
+      },
+      {
+        "source": "**",
+        "headers": [
+          {
+            "key": "Permissions-Policy",
+            "value": "microphone=(self)"
+          }
+        ]
+      },
+      {
+        "source": "**/*.html",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://www.recaptcha.net https://apis.google.com; connect-src 'self' https://*.googleapis.com wss://*.googleapis.com https://smt-weex-trading-bot.jannet-ekka.workers.dev https://data-api.binance.vision https://api.coingecko.com https://www.google.com; frame-src https://www.google.com https://www.recaptcha.net https://*.firebaseapp.com https://accounts.google.com; img-src 'self' data: blob: https://www.gstatic.com https://*.googleusercontent.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          }
+        ]
+      },
+      {
+        "source": "/",
+        "headers": [
+          {
+            "key": "Content-Security-Policy",
+            "value": "default-src 'self'; script-src 'self' 'unsafe-inline' https://www.gstatic.com https://www.google.com https://www.recaptcha.net https://apis.google.com; connect-src 'self' https://*.googleapis.com wss://*.googleapis.com https://smt-weex-trading-bot.jannet-ekka.workers.dev https://data-api.binance.vision https://api.coingecko.com https://www.google.com; frame-src https://www.google.com https://www.recaptcha.net https://*.firebaseapp.com https://accounts.google.com; img-src 'self' data: blob: https://www.gstatic.com https://*.googleusercontent.com; style-src 'self' 'unsafe-inline'; font-src 'self' data:; media-src 'self' blob:; worker-src 'self' blob:; object-src 'none'; base-uri 'self'; frame-ancestors 'self'"
+          },
+          {
+            "key": "X-Content-Type-Options",
+            "value": "nosniff"
+          },
+          {
+            "key": "Referrer-Policy",
+            "value": "strict-origin-when-cross-origin"
+          }
+        ]
+      }
     ]
+  },
+  "firestore": {
+    "rules": "firestore.rules"
   }
 }

@@ -70,9 +70,9 @@ All the models above are on the Gemini Developer API free tier, according to Fir
 **3 · Register the web app.** Click ⚙ **Project settings → General → Your apps → `</>` (Web)**. Nickname it `SMT World`, tick **Also set up Firebase Hosting**, then **Register app**. It shows a `firebaseConfig = {…}` block. That block is public by design, so you can paste it into the chat. Note the **Project ID**.
 
 **4 · App Check (proves the calls come from our site).** Firebase switched this on for AI Logic automatically on 2 Nov.
-   - Open console.cloud.google.com/security/recaptcha with the **same project** selected. Enable the reCAPTCHA Enterprise API if asked.
+   - Open console.cloud.google.com/security/recaptcha (Google Cloud now calls it **Security → Fraud Defense**) with the **same project** selected. Enable the reCAPTCHA Enterprise API if asked.
    - Click **Create key**. Type: **Web**. Domains: `<project-id>.web.app` and `<project-id>.firebaseapp.com`. Leave *checkbox challenge* **off**. Create it and copy the **key ID**.
-   - Back in Firebase, open **Security → App Check → Apps → SMT World → reCAPTCHA Enterprise**, paste the key, keep the threshold at 0.5, and **Save**.
+   - Back in Firebase, open **Security → App Check → Apps → SMT World → Fraud Defense (formerly reCAPTCHA Enterprise)**, paste the key, keep the threshold at 0.5, and **Save**. ⚠️ Not the row labelled plain **reCAPTCHA**: that's Classic v3, which is deprecated and takes a secret key.
    - On Spark this is reCAPTCHA's free tier (10,000 checks a month, no billing).
    - *If it fights you tonight:* **App Check → APIs → Firebase AI Logic → Unenforce** gets the demo working. Only the free quota is exposed, and there's no billing to abuse. Turn enforcement back on afterwards.
 

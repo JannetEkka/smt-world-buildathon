@@ -2,3 +2,5 @@ public/
 .firebase/
 .firebaserc
 firebase-debug.log
+node_modules/
+*-debug.log

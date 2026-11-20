@@ -930,6 +930,7 @@ async function loadAccount(){
 // session that expires mid-visit turns it back into "Sign in" (/code-review 10-07).
 function syncPill(){
   const pill = document.getElementById("hudSignin"); if(!pill) return;
+  if(window.SMT_PILL && window.SMT_PILL(pill)) return;   // 11-20: a Google sign-in on the Firebase build
   pill.textContent = isFounder() ? "Founder ✓" : "Sign in";
   pill.onclick = isFounder() ? openAccount : openLogin;
 }
@@ -1288,7 +1289,9 @@ const CG_WINDOW_S = 3900;
 const CALL_SOURCES = ["Binance", "CoinGecko"];
 let callCoin = "BTC", _calling = false, _grading = null;
 function loadCalls(){ try{ const a = JSON.parse(localStorage.getItem(CALLS_KEY) || "[]"); return Array.isArray(a) ? a : []; }catch(e){ return []; } }
-function saveCalls(a){ try{ localStorage.setItem(CALLS_KEY, JSON.stringify(a.slice(-CALLS_MAX))); }catch(e){} }
+function saveCalls(a){ try{ localStorage.setItem(CALLS_KEY, JSON.stringify(a.slice(-CALLS_MAX))); }catch(e){}
+  // 11-20: the Firebase build's signed-in user keeps Calls in their account (firebase/src/account.js)
+  try{ if(window.SMT_CALLS_SAVED) window.SMT_CALLS_SAVED(a.slice(-CALLS_MAX)); }catch(e){} }
 const callId = c => `${c.coin}@${c.t0}`;
 // SMT's lean on a coin: its committee's LONG/SHORT, or on a WAIT the conviction-weighted
 // sum of the advisors' votes — labelled a LEAN, never a trade (SmtFeed.kt `lean`). A
@@ -1396,7 +1399,7 @@ function renderCalls(msg){
     ${open ? `<div class="pd-card">You: ${arrow(open.dir)} · SMT: ${smtSay(open)}</div>` : ""}
     <div class="call-score">You ${sc("you")} · SMT ${sc("smtOut")} <span class="muted small">(graded calls)</span></div>
     <ul class="acct-positions call-list">${calls.slice().reverse().map(row).join("") || `<li class="muted small" style="border:none">No calls yet.</li>`}</ul>
-    <p class="call-note">Graded on Binance prices (CoinGecko if Binance is blocked). Saved in this browser only.</p>`;
+    <p class="call-note">Graded on Binance prices (CoinGecko if Binance is blocked). ${(window.SMT_CALLS_NOTE && window.SMT_CALLS_NOTE()) || "Saved in this browser only."}</p>`;
 }
 function openCalls(coin){
   exitFocus(); hideSidePanels();
