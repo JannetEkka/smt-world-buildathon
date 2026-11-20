@@ -13,6 +13,10 @@ const reply = o => ({ response: { usageMetadata: usage, text: () => typeof o ===
 export function getGenerativeModel(ai, params) {
   return { async generateContent(req) {
     await new Promise(r => setTimeout(r, 50));
+    // window.__mock.fail = {model: "500" | "cut"}: the two failures seen live on 11-20
+    const f = (M().fail || {})[params.model];
+    if (f === "500") { window.__calls.push({ step: "failed", model: params.model }); throw new Error(`AI: Error fetching from https://firebasevertexai.googleapis.com/v1beta/projects/x/models/${params.model}:generateContent: [500 Internal Server Error]`); }
+    if (f === "cut") { window.__calls.push({ step: "failed", model: params.model }); return reply('{"refuse":"none","answer":"I hold ADA on pa'); }
     const sch = params.generationConfig && params.generationConfig.responseSchema;
     const isAudio = Array.isArray(req) && req.some(p => p && p.inlineData);
     if (isAudio) {

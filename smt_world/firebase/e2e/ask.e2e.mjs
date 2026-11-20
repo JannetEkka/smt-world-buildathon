@@ -332,3 +332,15 @@ test("sign out: the pill and panel return to signed-out, and nothing more is wri
   assert.equal(await page.evaluate(() => window.__fsWrites.length), w);
   await page.context().close();
 });
+
+test("model fallback: a 500 or a cut-off answer from the first model is retried on the next one, as seen live on 11-20", async () => {
+  for (const kind of ["500", "cut"]) {
+    const page = await open({ mock: { fail: { "gemini-3.5-flash-lite": kind } } });
+    const r = await ask(page, "Why are you holding ADA?");
+    assert.match(r.text, /The rule that opened it/, kind);
+    const t = await page.evaluate(() => window.SMT_TIMINGS.slice(-1)[0]);
+    assert.equal(t.model, "gemini-3.8-flash", kind);
+    assert.ok((await calls(page, "failed")).length >= 1, kind);
+    await page.context().close();
+  }
+});
