@@ -1,0 +1,47 @@
+rules_version = '2';
+// SMT World — Firestore security rules (11-20). Each signed-in user can read and write ONLY
+// their own documents, with ONLY the fields the app writes (src/lib/sync.js CALL_KEYS,
+// questionRecord). Everything else is denied. Tested against the Firestore emulator:
+// test/rules.emulator.mjs.
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isOwner(uid) { return request.auth != null && request.auth.uid == uid; }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid);
+      allow create, update: if isOwner(uid)
+        && request.resource.data.keys().hasOnly(['name', 'lang', 'lastSeen'])
+        && (!('name' in request.resource.data) || (request.resource.data.name is string && request.resource.data.name.size() <= 100))
+        && (!('lang' in request.resource.data) || request.resource.data.lang in ['en', 'hi', 'bn'])
+        && (!('lastSeen' in request.resource.data) || request.resource.data.lastSeen == request.time);
+      allow delete: if isOwner(uid);
+
+      // Calls against SMT: id "<COIN>@<unix seconds>"
+      match /calls/{callId} {
+        allow read, delete: if isOwner(uid);
+        allow create, update: if isOwner(uid)
+          && callId.size() <= 32
+          && request.resource.data.keys().hasOnly(['coin', 'dir', 't0', 'due', 'smt', 'smtWhy', 'smtConv', 'graded',
+                                                   'move', 'px0', 'px1', 'gsrc', 'you', 'smtOut', 'void', 'tried'])
+          && request.resource.data.coin in ['BTC', 'ETH', 'BNB', 'SOL', 'LTC', 'XRP', 'ADA', 'DOGE']
+          && request.resource.data.dir in ['UP', 'DOWN']
+          && request.resource.data.t0 is int
+          && callId == request.resource.data.coin + '@' + string(request.resource.data.t0);
+      }
+
+      // Ask SMT question history: written once, never edited
+      match /questions/{qid} {
+        allow read, delete: if isOwner(uid);
+        allow create: if isOwner(uid)
+          && request.resource.data.keys().hasOnly(['q', 'lang', 'outcome', 'layer', 'at'])
+          && request.resource.data.q is string && request.resource.data.q.size() <= 500
+          && request.resource.data.lang in ['en', 'hi', 'bn']
+          && request.resource.data.outcome in ['answered', 'refused']
+          && request.resource.data.at == request.time;
+        allow update: if false;
+      }
+    }
+
+    match /{document=**} { allow read, write: if false; }
+  }
+}

@@ -52,11 +52,11 @@ export function injectScripts(html, feedBase) {
   return html
     .replace('<script src="app.js"></script>',
       `<script>window.SMT_FEED_BASE = ${JSON.stringify(feedBase)}; window.SMT_HOST = "firebase";</script>\n<script src="app.js"></script>\n` +
-      `<link rel="stylesheet" href="ask/ask.css"/>\n<script type="module" src="ask/ask.js"></script>`)
+      `<link rel="stylesheet" href="ask/ask.css"/>\n<script type="module" src="ask/ask.js"></script>\n<script type="module" src="ask/account.js"></script>`)
     .replace("<title>SMT World — A market you can sail</title>", "<title>SMT World — A market you can sail</title>\n<meta name=\"description\" content=\"SMT World: an AI crypto trader that has to prove why it traded. Ask it out loud in English, Hindi or Bengali.\"/>");
 }
 
-export async function build({ project = null, recaptcha = null, out = OUT } = {}) {
+export async function build({ project = null, recaptcha = null, screen = null, out = OUT } = {}) {
   fs.rmSync(out, { recursive: true, force: true });
   fs.mkdirSync(out, { recursive: true });
   for (const f of COPY) fs.cpSync(path.join(WORLD, f), path.join(out, f), { recursive: true });
@@ -77,7 +77,8 @@ export async function build({ project = null, recaptcha = null, out = OUT } = {}
     const cfg = sdkConfigFromCli(project);
     fs.writeFileSync(path.join(out, "ask", "firebase-config.js"),
       "// written by build.mjs from `firebase apps:sdkconfig web` — public by design\nexport const firebaseConfig = " + JSON.stringify(cfg, null, 2) + ";\n" +
-      `export const recaptchaKey = ${JSON.stringify(recaptcha || "")};\n`);
+      `export const recaptchaKey = ${JSON.stringify(recaptcha || "")};\n` +
+      `export const screenUrl = ${JSON.stringify(screen || "")};\n`);
   } else if (recaptcha) {
     const p = path.join(out, "ask", "firebase-config.js");
     fs.writeFileSync(p, fs.readFileSync(p, "utf8").replace(/export const recaptchaKey = "[^"]*";/, `export const recaptchaKey = ${JSON.stringify(recaptcha)};`));
@@ -95,7 +96,7 @@ export async function build({ project = null, recaptcha = null, out = OUT } = {}
 function countFiles(d) { let n = 0; for (const e of fs.readdirSync(d, { withFileTypes: true })) n += e.isDirectory() ? countFiles(path.join(d, e.name)) : 1; return n; }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const r = await build({ project: arg("--project"), recaptcha: arg("--recaptcha") });
+  const r = await build({ project: arg("--project"), recaptcha: arg("--recaptcha"), screen: arg("--screen") });
   console.log(`✔ built ${r.files} files into ${path.relative(process.cwd(), r.out) || r.out}`);
   console.log(`  feed snapshot (fallback) written ${r.feedAt}; live feed read from ${FEED_BASE}`);
   if (!r.configured) console.log("  ⚠️ firebase-config.js still has the placeholder: the world works, but Ask SMT can't reach Gemini.\n     Run with --project <your-project-id>, or paste the config into src/firebase-config.js.");
