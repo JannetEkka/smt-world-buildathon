@@ -1,0 +1,62 @@
+{
+ "at": "2026-11-20T03:05:27+00:00",
+ "source": "box",
+ "trend": {
+  "BTC": {
+   "up": false,
+   "r28": -23.864,
+   "r56": -26.565,
+   "ch24": -0.825,
+   "src": "SMT box (Binance)"
+  },
+  "ETH": {
+   "up": false,
+   "r28": -26.445,
+   "r56": -34.625,
+   "ch24": -1.416,
+   "src": "SMT box (Binance)"
+  },
+  "SOL": {
+   "up": false,
+   "r28": -29.426,
+   "r56": -37.5,
+   "ch24": -0.561,
+   "src": "SMT box (Binance)"
+  },
+  "BNB": {
+   "up": false,
+   "r28": -20.653,
+   "r56": -25.292,
+   "ch24": -1.001,
+   "src": "SMT box (Binance)"
+  },
+  "LTC": {
+   "up": false,
+   "r28": -28.096,
+   "r56": -41.167,
+   "ch24": -4.443,
+   "src": "SMT box (Binance)"
+  },
+  "XRP": {
+   "up": false,
+   "r28": -26.653,
+   "r56": -37.425,
+   "ch24": -0.5,
+   "src": "SMT box (Binance)"
+  },
+  "ADA": {
+   "up": false,
+   "r28": -28.45,
+   "r56": -38.676,
+   "ch24": -0.864,
+   "src": "SMT box (Binance)"
+  },
+  "DOGE": {
+   "up": false,
+   "r28": -26.123,
+   "r56": -39.211,
+   "ch24": -1.662,
+   "src": "SMT box (Binance)"
+  }
+ }
+}
