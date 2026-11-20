@@ -1,0 +1,56 @@
+{
+ "_note": "A0 (V6.1.217): the ONE list of what a guest may read from SMT's account feed. Read by smt/explain/account_snapshot.py (writes the public account.json) AND by functions/api/public_account.js (the Worker serves only these fields, whatever daemon wrote the file). A field not named here stays founder-only.",
+ "top": [
+  "generated_at",
+  "version",
+  "venue",
+  "account",
+  "daemon_shadow",
+  "feed_bucket",
+  "lane_modes"
+ ],
+ "equity": [
+  "equity_usd",
+  "equity_asset",
+  "equity_read_at"
+ ],
+ "row": [
+  "pair",
+  "lane",
+  "side",
+  "entry",
+  "qty",
+  "leverage",
+  "opened_at",
+  "mark",
+  "upnl_pct",
+  "peak_pct",
+  "setup",
+  "setup_name",
+  "funding_usd",
+  "exit",
+  "net_usd",
+  "gross_pct",
+  "closed_at",
+  "reason_plain"
+ ],
+ "closed_row_drop": [
+  "opened_at"
+ ],
+ "_closed_row_note": "operator 10-07: a guest sees no stop, target or hold time. A CLOSED row also drops its open time (open + close stamps give away a setup's clock); an OPEN row keeps it.",
+ "record": [
+  "n",
+  "win_rate",
+  "mean_net_pct",
+  "t_week",
+  "by_year",
+  "pairs_positive"
+ ],
+ "copy_setups": [
+  "capitulation_crash24_2x",
+  "slow_pyramid",
+  "slow_trend_2x",
+  "slow_trend_3x"
+ ],
+ "_copy_setups_note": "the paper COPIES (playbook.SHADOW_SETUPS, a test pins it) \u2014 never public, even in setup_totals"
+}
