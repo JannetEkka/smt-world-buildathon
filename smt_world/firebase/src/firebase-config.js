@@ -22,3 +22,7 @@ export const firebaseConfig = {
 // <project>.web.app and <project>.firebaseapp.com; then register it in Firebase →
 // App Check → Apps. Empty = App Check off on this build (the page says so if a call is refused).
 export const recaptchaKey = "";
+
+// OPTIONAL: the Worker route that screens each question with Google Cloud Model Armor
+// (functions/api/screen.js in SMT's repo). Empty = that layer is skipped; the others still run.
+export const screenUrl = "";

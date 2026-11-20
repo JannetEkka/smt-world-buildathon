@@ -54,3 +54,17 @@
 /* the demo chips stay in a short scrolling strip, so the answer keeps the screen */
 #tutor .chips{max-height:96px; overflow-y:auto}
 #chatlog:focus-visible,.ask-mic:focus-visible,.ask-lang button:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+.ask-privacy{flex-basis:100%; font-size:11px; color:var(--muted); margin-top:2px}
+
+/* sign in with Google + "My SMT" (account.js) */
+.acct-box{margin-top:12px; display:flex; flex-direction:column; gap:8px}
+.login-google{width:100%; padding:12px; border-radius:12px; border:1px solid rgba(255,255,255,.2); background:#fff; color:#1f1f1f;
+  font-weight:700; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; gap:10px}
+.login-google span{font-weight:900; color:#4285f4}
+.login-google:focus-visible,.acct-q:focus-visible{outline:2px solid var(--gold); outline-offset:2px}
+.acct-me{display:flex; align-items:center; gap:10px}
+.acct-me img{width:40px; height:40px; border-radius:50%; border:2px solid var(--gold)}
+.acct-stat{display:flex; justify-content:space-between; gap:8px; font-size:13px}
+.acct-qs{list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px}
+.acct-qs li{display:flex; justify-content:space-between; align-items:center; gap:6px}
+.acct-q{background:none; border:none; color:var(--gold-soft); text-align:left; cursor:pointer; font-size:13px; padding:2px 0}

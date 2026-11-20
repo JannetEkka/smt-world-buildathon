@@ -15,11 +15,10 @@
 // the firebaseConfig object is public by design). The Worker site (workers.dev) is the
 // backup and does not load this file.
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app.js";
 import { getAI, getGenerativeModel, getLiveGenerativeModel, GoogleAIBackend, Schema, ResponseModality }
   from "https://www.gstatic.com/firebasejs/13.2.0/firebase-ai.js";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app-check.js";
-import { firebaseConfig, recaptchaKey } from "./firebase-config.js";
+import { getToken } from "https://www.gstatic.com/firebasejs/13.2.0/firebase-app-check.js";
+import { app, appCheck, APPCHECK, configured, SCREEN_URL } from "./firebase.js";
 import { PERSONA, PATH, FACTS_RULE } from "./chat_prompt.js";
 import * as G from "./lib/guardrails.js";
 import * as F from "./lib/grounding.js";
@@ -27,28 +26,26 @@ import * as W from "./lib/wav.js";
 
 // ── Models (all on the Gemini Developer API FREE tier — Firebase AI Logic docs, 11-20) ──
 // Text: the same model the Worker's chat uses; the fallback is tried on 404/429/503.
-const TEXT_MODELS = ["gemini-3.1-flash-lite", "gemini-2.5-flash-lite"];
+// 11-20: Firebase's model list that day — gemini-3.8-flash (2026-09) and gemini-3.5-flash-lite
+// (2026-07, the named replacement for 3.1 Flash-Lite) both run WITHOUT billing on Spark;
+// Gemini 4 Neon/Carbon/Argon need Blaze. The answer gets the stronger model (Hindi and
+// Bengali quality); the quick jobs (writing down speech, the safety classifier) the lite one.
+// `?model=` picks the answer model from FREE_MODELS, so models can be timed on the live site.
+const FREE_MODELS = ["gemini-3.8-flash", "gemini-3.5-flash-lite", "gemini-4-hydrogen"];
+const PICK = (() => { try { const m = new URLSearchParams(location.search).get("model"); return FREE_MODELS.includes(m) ? m : null; } catch (e) { return null; } })();
+const MODELS = {
+  answer: PICK ? [PICK, "gemini-3.5-flash-lite"] : ["gemini-3.8-flash", "gemini-3.5-flash-lite"],
+  quick:  ["gemini-3.5-flash-lite", "gemini-3.8-flash"],
+};
+const TEXT_MODELS = MODELS.answer;   // what the "ready" line reports
 // Voice: the 3.x Live model ("available on the free tier of the Gemini Developer API").
 const LIVE_MODEL = "gemini-3.1-flash-live-preview";
 const LIVE_VOICE = "Kore";
 const LANG_NAME = { en: "English", hi: "Hindi", bn: "Bengali" };
 const BCP47 = { en: "en-IN", hi: "hi-IN", bn: "bn-IN" };
 
-const configured = !!(firebaseConfig && firebaseConfig.apiKey && !/PASTE|YOUR_/i.test(firebaseConfig.apiKey));
-// App Check proves a Gemini call comes from THIS site (Firebase turned enforcement on for
-// AI Logic automatically on 2026-11-02). reCAPTCHA Enterprise is the web provider; its
-// key is public, and on the Spark plan it runs on the free tier (10,000 checks a month).
-let ai = null, APPCHECK = "off";
-if (configured) {
-  try {
-    const app = initializeApp(firebaseConfig);
-    if (recaptchaKey) {
-      initializeAppCheck(app, { provider: new ReCaptchaEnterpriseProvider(recaptchaKey), isTokenAutoRefreshEnabled: true });
-      APPCHECK = "on";
-    } else console.warn("[ASK] App Check is OFF on this build (no recaptchaKey in firebase-config.js) — if Firebase enforces App Check for AI Logic, every Gemini call will be refused");
-    ai = getAI(app, { backend: new GoogleAIBackend() });
-  } catch (e) { console.error("[ASK] Firebase init failed", e); }
-}
+let ai = null;
+try { if (app) ai = getAI(app, { backend: new GoogleAIBackend() }); } catch (e) { console.error("[ASK] AI Logic init failed", e); }
 // a refused call says WHY in words, not "my line dropped" (A FALLBACK MUST NEVER BE SILENT)
 function whyFailed(e) {
   const m = String((e && e.message) || e);
@@ -95,6 +92,11 @@ const T = {
   intro:       { en: "In India, 93% of individual traders in equity futures and options lost money from FY22 to FY24, about ₹2 lakh each (SEBI, 2024). Signal groups tell you what to buy. I won't. I show you why I hold what I hold, and which reasons survived my own check. Tap 🎤 to ask out loud, in English, Hindi or Bengali.",
                  hi: "भारत में इक्विटी फ़्यूचर्स और ऑप्शंस के 93% व्यक्तिगत ट्रेडरों ने FY22 से FY24 के बीच पैसा गँवाया, औसतन लगभग ₹2 लाख (SEBI, 2024)। सिग्नल ग्रुप बताते हैं क्या ख़रीदना है। मैं नहीं बताऊँगा। मैं दिखाता हूँ कि मैंने क्या पकड़ा है और क्यों, और कौन-सी वजहें मेरी अपनी जाँच में टिकीं। 🎤 दबाकर हिंदी, बांग्ला या अंग्रेज़ी में पूछिए।",
                  bn: "ভারতে ইকুইটি ফিউচারস ও অপশনসের ৯৩% ব্যক্তিগত ট্রেডার FY22 থেকে FY24-এর মধ্যে টাকা হারিয়েছেন, গড়ে প্রায় ₹২ লাখ (SEBI, ২০২৪)। সিগন্যাল গ্রুপ বলে কী কিনতে হবে। আমি বলব না। আমি দেখাই আমি কী ধরে আছি আর কেন, আর কোন কারণগুলো আমার নিজের যাচাইয়ে টিকেছে। 🎤 চেপে বাংলা, হিন্দি বা ইংরেজিতে জিজ্ঞেস করুন।" },
+  // Gemini API free tier: Google may use prompts to improve its products (Gemini API Additional
+  // Terms) — so the visitor is told, in their language, before they speak
+  privacy:     { en: "🔒 Your question goes to Google Gemini to be answered. Please don't share personal details.",
+                 hi: "🔒 आपका सवाल जवाब के लिए Google Gemini को जाता है। कृपया निजी जानकारी न बताएँ।",
+                 bn: "🔒 আপনার প্রশ্ন উত্তরের জন্য Google Gemini-তে যায়। দয়া করে ব্যক্তিগত তথ্য দেবেন না।" },
   speakOn:     { en: "🔊 speak answers", hi: "🔊 जवाब बोलें", bn: "🔊 উত্তর বলো" },
 };
 const t = (k, lang) => (T[k] && (T[k][lang] || T[k].en)) || k;
@@ -121,11 +123,11 @@ function logUsage(step, model, res, started, error) {
   } catch (e) {}
 }
 
-// generateContent with the fallback chain; returns {res, model}. Throws the last error.
-async function generate(step, params, request) {
+// generateContent with a fallback chain; returns {res, model}. Throws the last error.
+async function generate(step, params, request, chain = MODELS.answer) {
   let last;
-  for (let i = 0; i < TEXT_MODELS.length; i++) {
-    const model = TEXT_MODELS[i], started = performance.now();
+  for (let i = 0; i < chain.length; i++) {
+    const model = chain[i], started = performance.now();
     try {
       const res = await getGenerativeModel(ai, { ...params, model }).generateContent(request);
       logUsage(step, model, res, started);
@@ -133,8 +135,8 @@ async function generate(step, params, request) {
     } catch (e) {
       last = e; logUsage(step, model, null, started, e);
       const msg = String((e && e.message) || e);
-      if (!/\b(404|429|503)\b|not found|quota|exhausted|unavailable|overloaded/i.test(msg) || i === TEXT_MODELS.length - 1) throw e;
-      console.warn(`[GEMINI] FALLBACK ${step} ${model} -> ${TEXT_MODELS[i + 1]}: ${msg.slice(0, 120)}`);
+      if (!/\b(404|429|503)\b|not found|quota|exhausted|unavailable|overloaded/i.test(msg) || i === chain.length - 1) throw e;
+      console.warn(`[GEMINI] FALLBACK ${step} ${model} -> ${chain[i + 1]}: ${msg.slice(0, 120)}`);
     }
   }
   throw last;
@@ -168,9 +170,45 @@ async function transcribe(wavB64, hintLang) {
   const prompt = `Transcribe exactly what the speaker says. The listener chose ${LANG_NAME[hintLang] || "English"}, but write whatever language is actually spoken: Hindi in Devanagari, Bengali in Bengali script, English in Latin letters. Keep coin names (SOL, BTC, ETH, BNB, XRP, ADA, DOGE, LTC) as said. Do not answer, translate or add anything. If there is no speech, return an empty transcript.`;
   const { res } = await generate("transcribe",
     { generationConfig: { responseMimeType: "application/json", responseSchema: TRANSCRIBE_SCHEMA, maxOutputTokens: 400, temperature: 0 } },
-    [{ inlineData: { mimeType: "audio/wav", data: wavB64 } }, { text: prompt }]);
+    [{ inlineData: { mimeType: "audio/wav", data: wavB64 } }, { text: prompt }], MODELS.quick);
   const j = JSON.parse(res.response.text());
   return { transcript: String(j.transcript || "").trim(), language: j.language };
+}
+
+// ── 2b. SCREENS before the answering model: Model Armor (optional) and a Gemini classifier ──
+// Model Armor is Google Cloud's prompt-injection / jailbreak filter. It needs a service account,
+// which can never sit in a web page, so the Worker calls it (functions/api/screen.js) after
+// checking this page's App Check token. Not configured = skipped, and the "ready" line says so.
+async function screenModelArmor(text) {
+  if (!SCREEN_URL) return { verdict: "off" };
+  const started = performance.now();
+  try {
+    const tok = appCheck ? (await getToken(appCheck, false)).token : "";
+    const ctl = new AbortController(); const to = setTimeout(() => ctl.abort(), 3000);
+    const r = await fetch(SCREEN_URL, { method: "POST", signal: ctl.signal,
+      headers: { "Content-Type": "application/json", "X-Firebase-AppCheck": tok }, body: JSON.stringify({ text }) });
+    clearTimeout(to);
+    const j = await r.json().catch(() => ({}));
+    if (!r.ok || !j.verdict) throw new Error(j.error || "HTTP " + r.status);
+    return { ...j, ms: Math.round(performance.now() - started) };
+  } catch (e) {
+    console.warn("[ARMOR] Model Armor unavailable, the other layers still run: " + String(e && e.message || e).slice(0, 160));
+    return { verdict: "unavailable", ms: Math.round(performance.now() - started) };
+  }
+}
+// The Gemini classifier: a separate, small call whose ONLY job is to label the question. The
+// question is fenced as data with a random marker, so text inside it can't close the fence.
+const GUARD_SCHEMA = Schema.object({ properties: {
+  category: Schema.enumString({ enum: ["safe", "advice", "guarantee", "savings", "injection"] }),
+  why: Schema.string({ description: "One short reason, in English" }),
+} });
+async function classify(text) {
+  const nonce = "@@" + Math.random().toString(36).slice(2, 10).toUpperCase() + "@@";
+  const { res } = await generate("guard",
+    { generationConfig: { responseMimeType: "application/json", responseSchema: GUARD_SCHEMA, maxOutputTokens: 120, temperature: 0 } },
+    G.guardPrompt(text, nonce), MODELS.quick);
+  const j = JSON.parse(res.response.text());
+  return { category: G.CATEGORIES.includes(j.category) ? j.category : "safe", why: String(j.why || "").slice(0, 200) };
 }
 
 // ── 3. THE ANSWER: structured output, every reason tied to a fact id ───────────────────
@@ -356,13 +394,23 @@ async function turn(question, { voice = false, t0 = performance.now(), voiceP = 
   if (g.category) { by = "rule"; cat = g.category; }
   else {
     if (!ai) { smtBubble(esc(NOT_READY)); return; }
-    const tb = typingBubble(); const ta = performance.now();
-    try { ans = await answer(question, lang); }
-    catch (e) { tb.remove(); console.error("[ASK] answer failed", e);
-      smtBubble(esc("I couldn't reach Gemini: " + whyFailed(e) + ".")); return; }
-    tb.remove(); timing.answer_ms = Math.round(performance.now() - ta); timing.model = ans.model;
-    if (ans.refuse && ans.refuse !== "none") { by = "model"; cat = ans.refuse; }
-    else { const a = G.checkAnswer(ans.text); if (a.category) { by = "answer"; cat = a.category; } }   // 3rd line
+    const tb = typingBubble(); const ts = performance.now();
+    // layers 2 and 3, side by side, BEFORE the answering model sees the question
+    const [armor, guard] = await Promise.all([screenModelArmor(question),
+      classify(question).catch(e => { console.warn("[GUARD] classifier unavailable: " + String(e && e.message || e).slice(0, 160)); return { category: "unavailable" }; })]);
+    timing.screen_ms = Math.round(performance.now() - ts); timing.armor = armor.verdict; timing.classifier = guard.category;
+    if (armor.verdict === "block") { by = "armor"; cat = G.CATEGORIES.includes(armor.category) ? armor.category : "injection"; }
+    else if (G.CATEGORIES.includes(guard.category)) { by = "classifier"; cat = guard.category; }
+    if (by) tb.remove();
+    else {
+      const ta = performance.now();
+      try { ans = await answer(question, lang); }
+      catch (e) { tb.remove(); console.error("[ASK] answer failed", e);
+        smtBubble(esc("I couldn't reach Gemini: " + whyFailed(e) + ".")); return; }
+      tb.remove(); timing.answer_ms = Math.round(performance.now() - ta); timing.model = ans.model;
+      if (ans.refuse && ans.refuse !== "none") { by = "model"; cat = ans.refuse; }                          // 4th line
+      else { const a = G.checkAnswer(ans.text); if (a.category) { by = "answer"; cat = a.category; } }   // 5th line
+    }
   }
   if (by) {
     const { r, html } = refusalHtml(cat, lang, by);
@@ -372,6 +420,7 @@ async function turn(question, { voice = false, t0 = performance.now(), voiceP = 
     spoken = ans.text;
   }
   chatHist.push({ role: "user", content: question }, { role: "model", content: spoken });
+  if (window.SMT_LOG_QUESTION) window.SMT_LOG_QUESTION(question, lang, by ? "refused" : "answered", by);   // signed-in history (account.js)
   if (typeof setChips === "function" && typeof ASK_CHIPS !== "undefined") setChips(ASK_CHIPS);
   if (wantVoice) {
     const v = await speak(spoken, lang, voiceP);
@@ -447,6 +496,7 @@ function setLang(l) {
   document.querySelectorAll("#askLang [data-lang]").forEach(b => { b.classList.toggle("on", b.dataset.lang === LANG); b.setAttribute("aria-pressed", String(b.dataset.lang === LANG)); });
   const inp = document.getElementById("tutorInput"); if (inp && tutorTrack === "ask") inp.placeholder = t("placeholder", LANG);
   const sp = document.getElementById("askSpeak"); if (sp) sp.textContent = t("speakOn", LANG);
+  const pv = document.getElementById("askPrivacy"); if (pv) { pv.textContent = t("privacy", LANG); pv.lang = LANG; }
 }
 function showVoiceUI(on) {
   document.getElementById("askMic")?.classList.toggle("hidden", !on);
@@ -465,7 +515,8 @@ function install() {
   bar.setAttribute("role", "group"); bar.setAttribute("aria-label", "Answer language");
   bar.innerHTML = `<button type="button" data-lang="en" lang="en">English</button><button type="button" data-lang="hi" lang="hi">हिन्दी</button><button type="button" data-lang="bn" lang="bn">বাংলা</button>
     <label class="ask-speak"><input type="checkbox" id="askSpeakBox"${SPEAK_TYPED ? " checked" : ""}/> <span id="askSpeak"></span></label>
-    <span class="ask-by">Gemini · Firebase AI Logic</span>`;
+    <span class="ask-by">Gemini · Firebase AI Logic</span>
+    <div class="ask-privacy" id="askPrivacy"></div>`;
   head.insertAdjacentElement("afterend", bar);
   bar.querySelectorAll("[data-lang]").forEach(b => b.addEventListener("click", () => setLang(b.dataset.lang)));
   bar.querySelector("#askSpeakBox").addEventListener("change", e => { SPEAK_TYPED = e.target.checked; store.set("smt_ask_speak", SPEAK_TYPED ? "1" : "0"); });
@@ -490,6 +541,6 @@ function install() {
     return r; };
   if (typeof startTutor0 === "function") window.startTutor = function () { const r = startTutor0.apply(this, arguments); showVoiceUI(false); return r; };
   if (!configured) console.warn("[ASK] firebase-config.js still has the placeholder — Gemini calls are OFF on this build");
-  console.log(`[ASK] Firebase Ask SMT ready · text ${TEXT_MODELS[0]} · voice ${LIVE_MODEL} · configured=${configured} · appcheck=${APPCHECK}`);
+  console.log(`[ASK] Firebase Ask SMT ready · answer ${MODELS.answer[0]} · quick ${MODELS.quick[0]} · voice ${LIVE_MODEL} · configured=${configured} · appcheck=${APPCHECK} · modelarmor=${SCREEN_URL ? "on" : "off"}`);
 }
 install();
