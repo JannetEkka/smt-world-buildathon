@@ -11,7 +11,8 @@ Ask SMT answers beginners about a trading bot's real positions, by voice or text
 
 - `checkQuestion()` in `lib/guardrails.js` runs first, on typed text and on voice transcripts. A hit returns the fixed refusal and **makes no answering-model call**.
 - The categories, in precedence order: `injection`, `savings`, `guarantee`, `advice`. Each category needs patterns in all three languages: English, Hindi (Devanagari and romanised), Bengali (Bengali script and romanised). Don't use `\b` next to Indic text or `%`.
-- The model's `refuse` field is the second line, and `checkAnswer()` on the model's text is the third. Don't remove a line to "simplify".
+- Then, still before the answering model: Model Armor (layer 2, through the Worker's `/api/screen`) and the Gemini classifier (layer 3, `guardPrompt()`; the question stays fenced between random markers). After that: the answering model's `refuse` field (4) and `checkAnswer()` on its text (5). Don't remove a layer to "simplify". Each refusal's badge names its layer (`STOPPED_BY`).
+- A signed-in user's data is theirs only: `firestore.rules` and `lib/sync.js` `CALL_KEYS` / `questionRecord` must list the same fields. `test/sync.test.mjs` checks the list, and `test/rules.emulator.mjs` checks the rules in the emulator.
 - Every refusal says why it refuses and what SMT does instead, and the badge names which line stopped it (`STOPPED_BY`).
 - Before you finish: add a test case in `test/guardrails.test.mjs` for any new pattern, and a benign question proving it doesn't over-block.
 
@@ -39,7 +40,7 @@ A feed snapshot instead of the live feed, browser speech instead of Gemini Live,
 ## Check before you finish
 
 ```
-node --test smt_world/firebase/test/*.test.mjs
+cd smt_world/firebase && npm test && npm run test:rules && npm run build && npm run test:e2e
 ```
 
-All tests must pass. Name the count in your summary.
+All tests must pass. Name the counts in your summary.

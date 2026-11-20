@@ -42,7 +42,15 @@ flowchart LR
   AIL[[Firebase AI Logic + App Check]] -.-> EARS & ANSWER & VOICE
 ```
 
-- **Deterministic first.** `checkQuestion()` runs before the answering model on every typed or spoken question. The model's own `refuse` field is the second line, and `checkAnswer()` on its text is the third.
+- **Five guard layers, cheapest first; a blocked question never reaches the answering model.**
+  1. Plain code (`checkQuestion()`, in English, Hindi, Bengali and Hinglish).
+  2. **Google Cloud Model Armor** (prompt injection and jailbreak). It runs through a Worker route that verifies the page's App Check token, and it's optional.
+  3. A **Gemini classifier**: its own structured call, with the question fenced between random markers.
+  4. The answering model's own `refuse` field.
+  5. `checkAnswer()` on its text, before anything is shown or spoken.
+
+  Each refusal's badge names the layer that stopped it.
+- **Sign in with Google (Firebase Auth) and Firestore.** Signing in is optional; guests can use everything. A signed-in user's Calls against SMT and Ask SMT questions are saved to their account and merge across devices. `firestore.rules` lets each user read and write only their own documents, with only the app's fields.
 - **It can't invent a reason.** The answer schema makes each point's `fact` an **enum of ids built from the live feed**, and `keepPoints()` re-checks every id.
 - **✓ and struck-out come from the data, not the model.** They are read from the feed's `drivers`, the advisors whose flipped input changed the decision.
 - **Fallbacks are visible.** A feed snapshot instead of the live feed, or browser speech instead of Gemini Live, is said on screen.
@@ -53,21 +61,37 @@ flowchart LR
 |---|---|
 | Firebase Hosting (Google Cloud, Spark plan) | serves the app at no cost, with no billing account |
 | Firebase AI Logic (Gemini Developer API) | every Gemini call; the key stays with Firebase, never in the page |
-| Gemini 3.1 Flash-Lite, structured output | the answer schema with fact-id enums, and audio transcription in three languages |
+| Gemini 3.8 Flash, structured output | the answer schema with fact-id enums |
+| Gemini 3.5 Flash-Lite | audio transcription in three languages, and the layer-3 safety classifier |
 | Gemini Live API (`gemini-3.1-flash-live-preview`) | speaks the answer and returns a transcript of what it said |
-| Firebase App Check + reCAPTCHA Enterprise | only this site can use the project's Gemini quota |
+| Firebase App Check + Fraud Defense (reCAPTCHA Enterprise) | only this site can use the project's Gemini quota |
+| Firebase Authentication (Google sign-in) | optional accounts for new users |
+| Cloud Firestore + security rules | each user's Calls and question history, private to them |
+| Google Cloud Model Armor | layer 2 of the guardrails: prompt-injection and jailbreak screening (optional) |
 | Agent Skill (`smt_world/firebase/skills/ask-smt-rules/SKILL.md`) | the rules any coding agent loads before changing Ask SMT |
 
 ## Run, test, deploy
 
 ```bash
-node --test smt_world/firebase/test/*.test.mjs     # guardrails, reason labels, build, WAV
-node smt_world/firebase/build.mjs                  # assembles smt_world/firebase/public/
-cd smt_world/firebase && node configure.mjs --project <firebase-project-id> --recaptcha <key-id>
-firebase deploy --only hosting --project <firebase-project-id>
+cd smt_world/firebase && npm install           # test tools only; the site itself needs no install
+npm test            # 37 unit tests: guardrails, reason labels, sync, App Check JWT checks, Model Armor, build, WAV
+npm run test:rules  # 5 security-rules tests in Google's Firestore emulator (needs Java)
+npm run build       # assembles public/
+npm run test:e2e    # 17 end-to-end tests in real Chromium with a fake microphone, under the site's CSP
+node configure.mjs --project <firebase-project-id> --recaptcha <key-id>
+npx firebase deploy --only hosting,firestore:rules --project <firebase-project-id>
 ```
 
-Node 22, no `npm install`. The Firebase SDK (13.2.0) loads from Google's CDN. Every turn logs `[ASK-TIMING]` in the browser console, with the seconds from the end of a spoken question to the first spoken word. The full setup guide (Firebase console, App Check, Cloud Shell) is in [`smt_world/firebase/README.md`](smt_world/firebase/README.md).
+The end-to-end suite drives the built site with a fake microphone. Only Google's SDK files are replaced, by deterministic stand-ins in `e2e/mocks/`; the page, feed, guardrails, catalog, rendering, audio, sign-in flow and Calls sync are the real code. It covers:
+- each of the five guard layers;
+- every cheat question, in three languages, making zero model calls;
+- the voice path, and Live's fallback to browser speech;
+- the live feed vs the snapshot;
+- signing in, Calls merging across devices, question history, signing out;
+- axe-core accessibility;
+- zero violations of the Content-Security-Policy.
+
+`npm run smoke:live` asks the deployed site real questions on real Gemini. It isn't in CI, because it uses quota. Every turn logs `[ASK-TIMING]` in the browser console, with the seconds from the end of a spoken question to the first spoken word. The full setup guide (Firebase console, App Check, Cloud Shell) is in [`smt_world/firebase/README.md`](smt_world/firebase/README.md).
 
 ## Layout
 
